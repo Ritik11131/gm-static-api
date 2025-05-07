@@ -30,15 +30,12 @@ app.get('/api/map', async (req, res) => {
     // Add any query parameters that were provided
     if (req.query.path) params.path = req.query.path;
     if (req.query.markers) {
-        if (Array.isArray(req.query.markers)) {
-          // Append each marker individually as separate 'markers' entries
-          req.query.markers.forEach((marker) => {
-            params.markers = marker;
-          });
-        } else if (typeof req.query.markers === 'string') {
-          params.markers = [req.query.markers];
-        }
+      if (Array.isArray(req.query.markers)) {
+        params.markers = req.query.markers; // axios will serialize this as repeated &markers=
+      } else {
+        params.markers = [req.query.markers];
       }
+    }
     if (req.query.maptype) params.maptype = req.query.maptype;
     if (req.query.zoom) params.zoom = req.query.zoom;
     if (req.query.scale) params.scale = req.query.scale;
@@ -70,8 +67,22 @@ app.get('/api/map', async (req, res) => {
       url: googleMapsUrl,
       params: params,
       headers: headers,
-      responseType: 'arraybuffer' // Important to receive binary data (image)
+      responseType: 'arraybuffer',
+      paramsSerializer: (params) => {
+        const qs = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            value.forEach(v => qs.append(key, v));
+          } else {
+            qs.append(key, value);
+          }
+        });
+        const queryString = qs.toString();
+        console.log('Full URL:', `${googleMapsUrl}?${queryString}`);
+        return queryString;
+      }
     });
+    
 
     // Set appropriate headers for the image response
     res.set('Content-Type', response.headers['content-type']);
